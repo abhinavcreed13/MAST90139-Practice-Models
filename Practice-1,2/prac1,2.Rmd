@@ -104,6 +104,8 @@ summary(model)
 
 We can use box-cox transformation method to understand if response variable transformation is needed or not.
 
+More Info: https://www.statisticshowto.datasciencecentral.com/box-cox-transformation/
+
 ```{r}
 # box-cox transformation for response variable
 library(MASS)
