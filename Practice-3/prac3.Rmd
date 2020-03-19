@@ -1,0 +1,357 @@
+---
+title: "Practical-3"
+author: "Abhinav Sharma"
+date: "19/03/2020"
+output: pdf_document
+---
+
+## Objective
+
+The National Institute of Diabetes and Digestive and Kidney Diseases conducted a study on 768 adult female Pima Indians living near Phoenix. The purpose of the study was to investigate factors related to diabetes.
+
+## Dataset
+
+The data may be found in the the dataset `pima` in `faraway` package.
+
+```{r}
+# loading dataset
+library(faraway)
+data(pima)
+```
+
+### Format
+
+The dataset contains the following variables:
+
+`pregnant`
+Number of times pregnant
+
+`glucose`
+Plasma glucose concentration at 2 hours in an oral glucose tolerance test
+
+`diastolic`
+Diastolic blood pressure (mm Hg)
+
+`triceps`
+Triceps skin fold thickness (mm)
+
+`insulin`
+2-Hour serum insulin (mu U/ml)
+
+`bmi`
+Body mass index (weight in kg/(height in metres squared))
+
+`diabetes`
+Diabetes pedigree function
+
+`age`
+Age (years)
+
+`test`
+test whether the patient shows signs of diabetes (coded 0 if negative, 1 if positive)
+
+## Initial Data Analyis
+
+```{r}
+# dimensions of dataset
+dim(pima)
+
+# top 5 rows
+head(pima)
+
+# summary of data
+summary(pima)
+```
+
+## Task 1
+
+Create a factor version of the test results and use this to produce an interleaved histogram to show how the distribution of `insulin` differs between those testing positive and negative. Do you notice anything unbelievable about the plot?
+
+### Solution
+
+```{r}
+# create a factor version of the test results
+pima$test.f <- factor(pima$test)
+levels(pima$test.f) <- c("negative","positive")
+
+# plot insulin vs pima
+par(mfrow=c(1,2))
+plot(insulin ~ test.f, pima, xlab="diabetes")
+plot(jitter(test,0.1)~jitter(insulin),pima,xlab="insulin",
+     ylab="signs of diabetes",pch="*")
+
+# interleaved histogram
+library(ggplot2)
+ggplot(pima, aes(x=insulin, y=..density.., color=test.f)) +
+  geom_histogram(position='dodge',binwidth = 30, fill="white") + 
+  geom_density(alpha=.2, fill="#FF6666") 
+```
+
+- density/count of `insulin` zero is very high (unbelievable)
+
+## Task 2
+
+Replace the zero values of `insulin` with the missing value code `NA`. Recreate the interleaved histogram plot and comment on the distribution.
+
+### Solution
+
+```{r}
+# replace values
+pima$insulinN <- pima$insulin
+pima$insulinN[pima$insulin==0] <- NA
+summary(pima$insulinN)
+
+# recreate plot
+ggplot(pima, aes(x=insulinN, y=..density.., color=test.f)) +
+  geom_histogram(position='dodge',binwidth = 30, fill="white") + 
+  geom_density(alpha=.2, fill="#FF6666") 
+```
+
+- Distribution of having diabetes 0(negative) and 1(positive) is not same, implying that `insulin` is having significant effect on `test` response variable.
+
+## Task 3
+
+Replace the incredible zeroes in other variables with the missing value code. Fit a model with the result of the diabetes test as the response and all the other variables as predictors. How many observations were used in the model fitting? Why is this less than the number of observations in the data frame?
+
+### Solution
+
+```{r fig.height=6}
+# plotting all predictors
+pairs(pima)
+```
+
+- `glucose` value cannot be zero
+- `triceps` thickness cannot be zero
+- `diastolic` blood pressure cannot be zero
+- `bmi` of a person cannot be zero
+
+```{r}
+# replacing incredible zero variables
+pima$glucoseN <- pima$glucose
+pima$glucoseN[pima$glucose==0] <- NA
+
+pima$tricepsN <- pima$triceps
+pima$tricepsN[pima$triceps==0] <- NA
+
+pima$diastolicN <- pima$diastolic
+pima$diastolicN[pima$diastolic==0] <- NA
+
+pima$bmiN <- pima$bmi
+pima$bmiN[pima$bmi==0] <- NA
+
+summary(pima)
+```
+
+```{r}
+# fitting logistic model with logit link
+modelNA <- glm(test ~ pregnant + glucoseN + diastolicN + tricepsN + insulinN + 
+               bmiN + diabetes + age, family=binomial, pima)
+summary(modelNA)
+
+# number of observations used in the model fitting
+nobs(modelNA)
+
+# total number of observations in the dataframe
+dim(pima)[1]
+```
+
+- All the missing values (NA) observations are skipped while fitting the model
+
+## Task 4
+
+Refit the model but now without the `insulin` and `triceps` predictors. How many observations were used in fitting this model? Devise a test to compare this model with that in the previous question.
+
+### Solution
+
+```{r}
+# refit model without insulin and triceps
+model2NA <- glm(test ~ pregnant + glucoseN + diastolicN + 
+               bmiN + diabetes + age, family=binomial, pima)
+
+# number of observations used in the model fitting
+nobs(model2NA)
+```
+
+We can create a hypothesis test to check whether `insulin` and `triceps` are significant predictors or not.
+$$
+\begin{aligned}
+  H_0: insulin=triceps=0 \\
+  H_1: insulin=triceps\neq0 
+\end{aligned}
+$$
+```{r}
+# testing hypothesis using F-test
+# omitting all NA observations
+pimaN <- na.omit(pima)
+dim(pimaN)
+
+# creating new models with same number of observations
+modelNA1 <- glm(test ~ pregnant + glucoseN + diastolicN + tricepsN + insulinN + 
+               bmiN + diabetes + age, family=binomial, pimaN)
+
+modelNA2 <- glm(test ~ pregnant + glucoseN + diastolicN + 
+               bmiN + diabetes + age, family=binomial, pimaN)
+
+# anova F-test
+anova(modelNA1, modelNA2, test='Chi')
+```
+
+- p-value is greater than 5% significance level, implying we can reject alternate hypothesis thereby stating `insulin` and `triceps` predictors are not significant. Hence, model without these predictors is better.
+
+## Task 5
+
+Use AIC to select a model. You will need to take account of the missing values. Which predictors are selected? How many cases are used in your selected model?
+
+### Solution
+
+```{r}
+# AIC model selection
+
+# stepwise selection without any missing values model
+step_model <- step(modelNA1, trace=FALSE)
+summary(step_model)
+```
+
+- Again, `insulin` and `triceps` are not selected as significant predictors, implying correctness of our previous hypothesis.
+- `glucose`, `bmi`, `diabetes` and `age` are considered as significant predictors as per AIC.
+
+## Task 6
+
+Create a variable that indicates whether the case contains a missing value. Use this variable as a predictor of the test result. Is missingness associated with the test result? Refit the selected model, but now using as much of the data as reasonable. Explain why it is appropriate to do this.
+
+### Solution
+
+```{r}
+# variable to indicate if there is some missing value
+pima$missingCase <- apply(pima,1,anyNA)
+xtabs(~test.f+missingCase,pima)
+```
+
+```{r}
+# fitting model with missingness
+modelMissingCases <- glm(test.f~missingCase, family=binomial,pima) 
+summary(modelMissingCases)
+```
+
+We can check if missingness is associated with `test` result using hypothesis testing by checking whether `missingCase` parameter is significant or not.
+$$
+\begin{aligned}
+  H_0: missingCase=0 \\
+  H_1: missingCase\neq0 
+\end{aligned}
+$$
+```{r}
+# checking significance of missingCase parameter
+anova(modelMissingCases,test="Chi")
+```
+
+- p-value(0.3037) is greater than 5% significance level, implying alternate hypothesis can be rejected, thereby `missingCase` is not significant.
+- Hence, missingness is not associated with `test` results.
+
+```{r}
+# re-fit selected model with pimaN dataset
+# pimaN dataset is having no missing values
+modelrs <- glm(test.f ~ pregnant + glucoseN + bmiN + diabetes + age,
+                 family=binomial, pimaN)
+summary(modelrs)
+```
+
+- we can use model by omitting all missing values (NA) since missingness is not having any significant effect on the `test` response variable.
+
+## Task 7
+
+Using the last fitted model of the previous question, what is the difference in the log-odds of testing positive for diabetes for a woman with a BMI at the first quartile compared with a woman at the third quartile, assuming that all other factors are held constant? Then calculate the associated odds ratio value, and give a 95% confidence interval for this odds ratio.
+
+### Solution
+
+```{r}
+# BMI first and third quartile - using dataset with no missing values
+summary(pimaN$bmiN)
+```
+
+Log-odds are given as:
+$$
+o = \frac{p}{1-p} \Rightarrow p = \frac{o}{1+o}
+$$
+In terms of logit link, this can be written as:
+$$
+log \frac{p_i}{1-p_i} = \eta_i \Rightarrow log\:o_i=\eta_i
+$$
+
+Difference in log-odds for 1st and 3rd quartile can be given as:
+$$
+log\:o_1 - log\:o_3 = \eta_1 - \eta_3
+$$
+```{r}
+# get quartiles
+(bmi_1st_quartile = quantile(pimaN$bmiN,0.25))
+(bmi_3rd_quartile = quantile(pimaN$bmiN,0.75))
+
+# get bmi fitted value
+(beta_bmi = coefficients(modelrs)['bmiN'])
+
+# calculate eta keeping other factors constant
+eta_1st_quartile = bmi_1st_quartile * beta_bmi
+eta_3rd_quartile = bmi_3rd_quartile * beta_bmi
+
+# difference in log odds for 1st and 3rd quartiles
+(diff_log_odds = eta_1st_quartile - eta_3rd_quartile)
+```
+Odds-ratio is given as:
+$$
+\frac{o_1}{o_3} = exp(log(\frac{o_1}{o_3})) = exp(log\:o_1 - log\:o_3) = exp(\eta_1 - \eta_3)
+$$
+```{r}
+# log odds-ratio value
+(exp(diff_log_odds))
+```
+
+We can calculate 95% confidence interval for bmi parameter as:
+$$
+[\hat{\beta_{bmi}}\: \pm \: q_{0.975}*\sqrt{I(\beta_{bmi})^{-1}}]
+$$
+```{r}
+# calculate 95% confidence interval for bmi parameter
+(conf_int_bmi = confint(modelrs,'bmiN'))
+
+# 95% confidence interval for log-odds ratio
+(exp(conf_int_bmi * (bmi_1st_quartile - bmi_3rd_quartile)))
+```
+
+- So, keeping other parameters constant, odds of showing evidence of diabetes for a women with a BMI at the first quartile(28.4) are between `35 to 71 percent less` as compared to a women with a BMI at the third quartile(37.1) 
+
+## Task 8
+
+Do women who test positive have higher diastolic blood pressures? Is the diastolic blood pressure significant in the logistic regression model? Explain the distinction between the two questions and discuss why the answers are only apparently contradictory.
+
+### Solution
+
+```{r}
+# checking correlations of diastolic with other predictors
+data(pima)
+# removing rows
+missing <- with(pima, missing <- glucose==0 | diastolic==0 | triceps==0 | bmi == 0) 
+pima <- pima[!missing,]
+cor(pima)['diastolic',]
+```
+
+- Clearly, `diastolic` shows a positive correlation with `test` response variable.
+- Moreover, `diastolic` have positive correlation with other variables such as `glucose`, `bmi` and other predictors. So, `test` is more likely to be positive when `diastolic` is large as other predictors will also be large.
+
+```{r}
+# interleaved histogram for diastolic
+ggplot(pimaN, aes(x=diastolic, y=..density..,color=test.f)) +
+  geom_histogram(position='dodge', fill='white', binwidth = 10) +
+  geom_density(alpha=.2, fill="#FF6666")
+```
+
+- On contrary, distribution for both negative and positive diabetes looks similar, implying that `diastolic` is not significant enough for `test` response variable.
+
+```{r}
+# logistic model 
+summary(modelNA)
+```
+
+- This also supports our claim that `diastolic` is not significant in presence of other variables as p-value is very high at 5% significance level
+
+Hence, answers appears to be contradictory.
