@@ -2,7 +2,10 @@
 title: "Practical-3"
 author: "Abhinav Sharma"
 date: "19/03/2020"
-output: pdf_document
+#output: pdf_document
+output:
+  md_document:
+    variant: markdown_github
 ---
 
 ## Objective
@@ -315,7 +318,10 @@ $$
 (conf_int_bmi = confint(modelrs,'bmiN'))
 
 # 95% confidence interval for log-odds ratio
-(exp(conf_int_bmi * (bmi_1st_quartile - bmi_3rd_quartile)))
+(odds_ratio = (exp(conf_int_bmi * (bmi_1st_quartile - bmi_3rd_quartile))))
+
+# chance
+(odds_ratio/(1+odds_ratio))
 ```
 
 - So, keeping other parameters constant, odds of showing evidence of diabetes for a women with a BMI at the first quartile(28.4) are between `35 to 71 percent less` as compared to a women with a BMI at the third quartile(37.1) 
